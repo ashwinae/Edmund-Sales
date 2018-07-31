@@ -1,16 +1,10 @@
----
-title: "Final-report"
-author: "Ashwin Ayyasamy Elamurugu"
-output: html_document
----
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 
 #Introduction:
-We have been given three data files, namely, Edmunds, IRS, and LA Cell Towers, that have just one common variable among them (Zip Code) and give out totally different and seemingly disconnected information. While Edmunds data deals with consumers' interest in cars and the dealerships to which the information was passed to, IRS and LA Cell Towers deal with tax returns filed and information about cell towers, both based on zip codes, respectively. 
+ We have been given three data files, namely, Edmunds, IRS, and LA Cell Towers, that have just one common variable among them (Zip Code) and give out totally different and seemingly disconnected information. While Edmunds data deals with consumers' interest in cars and the dealerships to which the information was passed to, IRS and LA Cell Towers deal with tax returns filed and information about cell towers, both based on zip codes, respectively. 
 
 The IRS data shows a lot of potential for analysis tests to be performed on it. Considering the abundance of numeric variables in it, I can be choosing any two of them to perform a t-test, to find out if they are related to one another. It is highly important to perform a t-test as it helps us figure out if the variables that look disconnected are actually similar, and vice-versa. It would also save our time and space, in future, as we can avoid working on variables that we find to be the same.
        
