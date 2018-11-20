@@ -6,6 +6,3 @@
 • Developed a custom function that takes a zip code and returns a data frame with specific summarized information from Edmunds, Tax Returns, and Los Angeles Cellular Towers
 
 • Produced an interactive map of cellular towers based on spatial location
-
-For the knitted output, please follow the link:
-file:///Users/Ashwin/Documents/Final-Report/final-report1.html 
