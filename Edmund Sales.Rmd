@@ -1,0 +1,372 @@
+---
+title: "Edmund Sales"
+author: "Ashwin Ayyasamy Elamurugu"
+output:
+html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+#Introduction:
+The three data files, namely, Edmunds, IRS, and LA Cell Towers,  have just one common variable among them (Zip Code) and give out totally different and seemingly disconnected information. While Edmunds data deals with consumers' interest in cars and the dealerships to which the information was passed to, IRS and LA Cell Towers deal with tax returns filed and information about cell towers, both based on zip codes, respectively. 
+
+The IRS data shows a lot of potential for analysis tests to be performed on it. Considering the abundance of numeric variables in it, I can be choosing any two of them to perform a t-test, to find out if they are related to one another. It is highly important to perform a t-test as it helps us figure out if the variables that look disconnected are actually similar, and vice-versa. It would also save our time and space, in future, as we can avoid working on variables that we find to be the same.
+       
+Using the numeric variables, in IRS, that tell us about the number of returns filed as 'single' and the number of dependents, a linear regression can be performed to figure out the effect that one variable might possibly have on the other, and if there is a confoudning variable that might be impacting both the variables. While t-test tells us if any two variables are in some way related, linear regression gives us the actual possible relationship. In this case, it is essential to create a linear model as it would give out the possible change that the latter varible might undergo when the former varies. Moreover, it might be a subject of interest to many to know the extent to which the number of returns filed as 'single' variable could explain the variation in the number of dependents variable. 
+       
+A custom function 'zipit' that takes a vector of inputs and outputs a table that gives the user almost all of the essential information related to each zip code, using all the three given data files. While it is always useful to create functions that make it easy for the user to get the required information at once and without much time consumption, this function, in particular, might be highly useful for further research involving zip codes. 
+
+```{r}
+library(haven)
+library(readxl)
+library(readr)
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(rvest)
+library(leaflet)
+```
+
+
+#Edmunds Data:
+Edmunds Data, originally taken out from Edmunds.com, tells us about a consumer's interest in a car and the dealership to which the information about the consumer has been passed so as to make it feasible for a transaction to occur. Edmunds.com terms each such consumer's interest as 'lead' and gives each one an id (can be seen as lead_id in the data file). 
+             So, each lead_id is an observation and the variables give out information regarding the date on which the lead was submitted, the specifications of the car model like its price (as quoted by the dealership and also as suggested by the manufacturer), its model year, and more, and the details about the dealership to which the particular lead was passed to. The loaction information of each dealership, like its place and zip code, make up the details involving the deealership. 
+             
+```{r , cache = TRUE}
+edmunds <- read_stata("data/edmunds.dta")
+```
+
+
+###Cleaning Edmunds:
+
+*1*. Retained just the required varibales like lead_id, lead_date, model_year, make, model, msrp, dealer_dma, and dealer_zip, by subsetting. 
+```{r}
+edmunds <- edmunds[, c(1,2,4,5,16,21:23)]
+```
+
+*2*. Replaced missing values with N/A by subsetting, and ensured that variables are in their recommeneded classes using 'type_convert'.
+```{r}
+edmunds <- type_convert(edmunds)
+#Ensuring that variables are in their recommended classes
+
+edmunds$msrp[edmunds$msrp == " "] <- NA
+edmunds$lead_id[edmunds$lead_id == ""] <- NA
+#Replacing missing values with N/A
+
+options(scipen = 999)
+#To force R to not use exponential form
+
+#dim(edmunds)
+```
+**Dimensions of original Edmunds data**: 2445924 observations and 24 variables
+
+**Dimensions of clean Edmunds data** : 2445924 observations and 8 variables
+
+###Summarizing Edmunds:
+
+####(1) Distribution of leads based on months:
+```{r, fig.width = 8, fig.height = 6}
+
+edmunds <- edmunds %>% 
+               mutate( month = months(lead_date))
+#Creating a new column with months taken out from lead_date
+
+edmunds$month <- factor(edmunds$month,
+                       level=month.name)
+#To order months from Jan to Dec and not based on their alphabetical order
+
+edmunds %>% 
+  ggplot() + 
+  geom_bar(aes(x = month, na.rm = TRUE)) +
+  ggtitle("Distribution of leads submitted in each month") +
+    xlab("month") +
+    ylab("frequency")
+#Plotting a bar graph
+```
+
+The graph looks slightly right-skewed with the first three months getting the most number of leads. The spread seems to be centered around May while March gets the maximum number of leads.
+
+####(2) Distribution of model_year:
+```{r, fig.width=8, fig.height = 6}
+edmunds %>% 
+  ggplot() + 
+  geom_bar(aes( x = model_year, na.rm = TRUE)) +
+  ggtitle("Distribution of years in which the interested cars were manufactured") +
+      xlab("year") +
+      ylab("frequency")
+```
+
+The graph, centered around 2014, looks heavily left-skewed with most of the cars being produced in the last two years. The maximum number of interested cars were manufactured in the year 2014. 
+
+####(3) Tables of most and least popular manufacturers:
+```{r}
+edmunds %>%
+  group_by(make) %>% 
+  summarize(most_popular_manufacturers = n()) %>%
+  arrange(desc(most_popular_manufacturers)) %>% 
+  head() %>% 
+  kable()
+#Arranging the number of manufacturers in a specific order to get the most and least popular by using head and tail functions respectively
+
+edmunds %>%
+  group_by(make) %>% 
+  summarize(least_popular_manufacturers = n()) %>%
+  arrange(desc(least_popular_manufacturers)) %>% 
+  tail() %>% 
+  kable()
+```
+
+Honda was the most popular manufacturer while 'Oldsmobile' and 'isuzu' were the least popular. 
+
+####(4) Distribution of msrp :
+```{r, cache= FALSE, fig.width=8, fig.height=6}
+edmunds %>% ggplot() + 
+  geom_histogram(aes(as.numeric(msrp), na.rm = TRUE,
+                     col = "white")) +
+  ggtitle("Distribution of msrp") +
+  xlab("Price suggested by the car manufacturer in dollars") 
+
+```
+
+**Summary of msrp**:
+```{r}
+edmunds %>% 
+  select(msrp) %>% 
+  summarise( mean_price = mean(msrp, na.rm = TRUE),
+             median = median(msrp, na.rm = TRUE),
+             standard_deviation = sd(msrp, na.rm = TRUE),
+             IQR = IQR(msrp, na.rm = TRUE)
+             ) %>% kable()
+#Summarizing the data
+```
+
+With the distribution of msrp being heavily right-skewed, the typical value is given by the median and not the mean. So, typical value of msrp is 29910 dollars, and the spread varies by 14649 dollars (given by Inter Quartile Range).
+
+#IRS data:
+This data, obtained from IRS tax returns in year 2014, tells us all about the different kinds of income and tax returns filed, based on different categories like filed as single, filed as married, number of dependents, tax exemptions, and more, from different Zip codes.
+                  So, each Zip code is an observation in this data file and the most important variables include number of tax returns filed, those filed a single, married, or head of household, number of dependents, gross income, and annual income. 
+The original data contains    number of variables and    number of observations.
+The clean data contains    number of variables and    number of observations.
+```{r}
+irs <- read_excel("data/irs-la-zip.xls")
+```
+
+
+###Cleaning IRS:
+*1*. Retained required variables like N1, MARS1, MARS2, MARS4, NUMDEP, AOO1OO, AND A02650, by subsetting.
+```{r}
+irs <- irs[ ,c(1:5,8,9,11)]
+```
+
+*2*. Gave retained variables more descriptive names, using names(), replaced missing values with NA, and ensured that variables are in their recommeneded classes.
+```{r}
+names(irs) <- c("zip", "num_returns", "single_returns", "joint_returns", "householdhead_returns" , "num_dependents", "gross_income", "annual_income" )
+
+irs[irs == ""] <- NA
+#Replacing missing values with NA
+
+#used str(irs) to figure out if the variables are in their recommmened classes
+
+```
+**Dimensions of original IRS data** : 288 observations and 111 variables
+
+**Dimensions of clean IRS data**: 288 observations and 8 variables
+
+###Summarizing IRS:
+The variables N1, MARS1, MARS2, MARS4, NUMDEP and A00100, which were renamed to num_returns, single_returns, joint_returns, household_returns, num_dependents, and gross_income, tell us about the number of returns filed, number of returns with filing status being "single", "married", and "head of household", number of dependents, and the gross income of residents, in each zip code. 
+
+**The correlation of these variables if given by** :
+```{r, fig.height=7, fig.width=9}
+irs1 <- irs[ ,-c(1,8)]
+pairs(irs1)
+#To plot the correlation between the variables
+```
+
+Looking at the plot, it can be concluded that the variables are positively correlated to one another. For example, an increase in num_returns would mostly result in an increase in the other variables in the plot and vice versa. The same applies to all the other variables taken into consideration. 
+
+
+###Analyzing IRS:
+####1. t-test on gross_income and annual_income: 
+I chose the adjusted gross income and the annual income variables to perform a t-test as I want to know if there is a need to retain both the variables. While the variables seem similar to one another, I would like to figure out if they are the same or if there are any confounding variables acting on them, by performing a t-test. By looking at their difference in means, with a 95% confidence interval, I hope to know if the variables are essentially the same and if one of them can be taken out so that the data set becomes easier to analayze for further research. Using a t-test is appropriate in this case because I am just hoping to know if the variables are the same and not to figure out the effect that one variable has on the other (we use linear regression for such a case).
+
+**t.test results**:
+```{r}
+t.test(irs$gross_income, irs$annual_income)
+```
+
+**t-test Conclusion** : We have obtained a negative t-statistic which suggests that the sample mean of gross_income is less than the sample mean of annual_income. But then, this statistic matters only when the obtained p-value is less than the mentioned alpha value (alpha = 1 - (confidence interval/100)). With the alpha being 0.05 and the obtained p-value being 0.7985, it can be conluded that the difference in means is 'not statistically signifacnt' ,i.e., the null hypothesis, that the true difference in means is equal to 0, is true!
+           Thus, with the null hypothesis turning out to be true, I now know that the gross_income and annual_income varibales are "actually" same. I can confidently remove the annual_income variable from the data set and save space and time while conducting further analysis or research.
+
+
+####2. Linear regression on num_dependents and single_returns:
+Creating a linear model that relates the number of dependents and the number of return filed as 'single' would help us clearly discern the effect that the former variable has on the latter:
+```{r,fig.height=7, fig.width= 7}
+attach(irs) 
+plot(single_returns , num_dependents,
+     pch = 20,
+     cex = 0.5,
+     main = "The Number of dependents plotted against returns filed as 'single'",
+     xlab = "Number of returns filed as 'single' ",
+     ylab = "Number of dependents",
+    abline(lm(num_dependents ~ single_returns), col = "red"))
+     
+summary(lm(num_dependents ~ single_returns))
+```
+
+Looking at the graph, with a linear trend and a positive slope, it can be concluded that the 'number of returns filed as single' and 'number of dependents' variables are positively correlated. The slope coefficient tells us that for every one unit increase in the number of 'single' returns filed, the number of dependents increases by 1.679 times, and the R-squared value signifies that about 52.6 percent of the variation in the number of dependents may be explained by the other variable.
+                              While we cannot really state that the variables are strongly correlelated (in reference to R-squared value), it is safe to conclude that they are reasonably related to one another. 
+Also, the presence of a lurking variable is highly doubted as the explonatory and the dependent variables exhibit a linear trendThe results are surprising as we would generally expect a decrease in the number of dependents when the number of returns filed as 'single' increases. It would be highly interesting to subject these variables to further research to discern the reason behind the unexpected results. 
+
+#LA Cell Towers Data:
+This data, sourced from HSIP Freedom Land_Mobile_private, gives out information regarding the cell towers located in various zip codes in Los Angeles. 
+                So, each cell tower (given by an OBJECTID) is an observation and the variables give out information about the location details of each tower such as its address, post_id, latitude and longitude, the kind of communication (like Land/Mobile) for which each tower is used, and the link from which the information was obtained.
+```{r}
+la_towers <- read.csv("data/la-cell-towers.csv", na.strings = c(""))
+#Replacing missing values with NA
+```
+
+           
+###Cleaning LA Cell Towers:
+*1*. Retained variables like OBJECTID, city, state, ZIP, longitude, and latitude, and dropped the rest using their column numbers.
+```{r}
+la_towers <- la_towers[c(1,10,11,20,21,22)]
+```
+
+*2*. Ensured that retained variables are in their recommeneded classes.
+Note: Missing values were replaced with NA while reading the data in. 
+```{r}
+#str(la_towers)
+la_towers$city <- as.character(la_towers$city)
+#Converting city variable to character
+
+la_towers[la_towers == ""] <- NA
+```
+
+**Dimensions of original data**: 9248 observations and 22 variables
+
+**Dimensions of clean data**: 9248 observations and 6 variables
+
+###Summarizing LA Cell Towers:
+*1. Tables showing the Zip Codes with most and least number of cell towers respectively*:
+```{r}
+la_towers %>%
+  group_by(ZIP) %>% 
+  summarize(mostcelltowers = n()) %>% 
+  arrange(desc(mostcelltowers)) %>% 
+  head() %>% 
+  kable()
+
+la_towers %>%
+  group_by(ZIP) %>% 
+  summarize(leastcelltowers = n()) %>% 
+  arrange(desc(leastcelltowers)) %>% 
+  tail() %>% 
+  kable()
+```
+
+While zipcode 91042 has the most number of cell towers, there seem to be quite a few zipcodes that have just one cell tower in them. 
+
+
+*2. Names of the cities that are located in the zipcode with the most number of cell towers*:
+```{r}
+cities <- unique(la_towers$city[(la_towers$ZIP == 91042)])
+
+cities[cities == "NA"] <- NA_character_
+#Making the object feasible to remove NA values
+
+cities[!is.na(cities)]
+#removed NA values
+```
+
+##Custom Function: 
+```{r, echo = TRUE}
+x <- c()
+zipit <- function(x){
+   #Using if/else to notify the user about no input.
+   if(missing(x)) {
+     print("Error in Zip Codes input")
+   }
+  else{
+     # Looking for 'x' (by filtering) in each data set and then summarizing the required information using          summarize()
+    ntowers <-  la_towers %>% 
+    filter( ZIP %in% x) %>% 
+    group_by(ZIP) %>% 
+    summarize(num_cell_towers = n()) %>% 
+    rename(zip = ZIP) #Renaming to make it easier while joining data sets
+
+nreturns <-  irs %>%  
+    filter(zip %in% x) %>% 
+    group_by(zip) %>% 
+    mutate(combined_returns = single_returns + joint_returns + householdhead_returns) %>% 
+    #Creating a new variable that outputs the required information
+    summarize(total_filed_tax_returns = combined_returns)
+    
+  
+nleads <- edmunds %>% 
+     filter(dealer_zip %in% x) %>% 
+    group_by(dealer_zip) %>% 
+    summarize(num_car_leads = n()) %>% 
+    rename(zip = dealer_zip)
+
+  return(full_join ( 
+            full_join(nleads, ntowers, by= "zip"),
+                                 nreturns, by = "zip")) 
+#Joining all the three obtained data sets and returning it to user
+  }
+}
+```
+
+Examples that show that 'zipit' works:
+
+1. zipit()
+```{r}
+zipit()
+```
+
+2. zipit(c(90001, 90095, 64055))
+```{r}
+zipit(c(90001, 90095, 64055))
+```
+
+3. zipit(7890)
+```{r}
+zipit(7890)
+```
+
+Thus, the function displays an error when there is no input, outputs a table with the required information if the zipcodes match with those in the data files, and just gives out an empty table if the zipcodes do not match.
+
+##Joining Data Files:
+*1. Appending the information in 'irs-la-zip.xls' to the data in 'edmunds.dta' and naming it 'edm_irs'* :
+```{r }
+edm_irs <- left_join(edmunds, irs, by = c("dealer_zip" = "zip"))
+```
+
+*2. Combining the data in 'edm_irs' and 'LA Cell towers' by the Zip code that has the most number of cell towers* :
+```{r}
+la_cell_towers_most <- subset(la_towers, ZIP == 91042)
+
+edm_irs1 <- semi_join(edm_irs, la_cell_towers_most, by = c("dealer_zip" = "ZIP"))
+```
+
+**Dimensions of edm_irs1** :
+```{r}
+dim(edm_irs1)
+```
+
+Thus, there are zero observations left after semi-joining.
+
+##Map that shows the location of towers:
+```{r}
+leaflet(la_towers) %>%
+  addTiles() %>%
+  addMarkers(lng = ~longitude, lat = ~latitude,
+             popup = ~city
+             ) %>% 
+  addProviderTiles("OpenTopoMap")
+```
+
